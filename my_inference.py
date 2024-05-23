@@ -192,38 +192,49 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
     green_img = np.uint8(green_img)
 
     # Save the results instead of showing them
-    cv2.imwrite(os.path.join(output_dir, 'composite_with_background.png'), cv2.cvtColor(com_img, cv2.COLOR_RGB2BGR))
-    cv2.imwrite(os.path.join(output_dir, 'green_screen.png'), cv2.cvtColor(green_img, cv2.COLOR_RGB2BGR))
-    cv2.imwrite(os.path.join(output_dir, 'alpha_matte.png'), cv2.cvtColor(alpha_rgb, cv2.COLOR_RGB2BGR))
+    # cv2.imwrite(os.path.join(output_dir, 'composite_with_background.png'), cv2.cvtColor(com_img, cv2.COLOR_RGB2BGR))
+    # cv2.imwrite(os.path.join(output_dir, 'green_screen.png'), cv2.cvtColor(green_img, cv2.COLOR_RGB2BGR))
+    # cv2.imwrite(os.path.join(output_dir, 'alpha_matte.png'), cv2.cvtColor(alpha_rgb, cv2.COLOR_RGB2BGR))
 
     return [(com_img, 'composite_with_background'), (green_img, 'green_screen'), (alpha_rgb, 'alpha_matte')]
 
-# Simulate inputs
-input_image = {
-    "image": cv2.cvtColor(cv2.imread('/home/aniket/shree/Matting-Anything/assets/demo.jpg'), cv2.COLOR_BGR2RGB),
-    "mask": np.zeros((1024, 1024, 1), dtype=np.uint8)  # Assuming no scribble mask
-}
-text_prompt = "the girl in the middle"
-task_type = "text"
-background_prompt = "downtown area in New York"
-background_type = "generated_by_text"
-box_threshold = 0.25
-text_threshold = 0.25
-iou_threshold = 0.5
-scribble_mode = "split"
-guidance_mode = "alpha"
+import glob
+# Define the path to the directory containing images
+image_directory = '/home/aniket/shree/Matting-Anything/13-07-2022/13_07_2022/Ground_RGB_Photos/Armillaria_Stage_3'
 
-# Call the function
-results = run_grounded_sam(input_image, text_prompt, task_type, background_prompt, background_type, box_threshold, text_threshold, iou_threshold, scribble_mode, guidance_mode)
+# Get a list of all image files in the directory
+image_files = glob.glob(os.path.join(image_directory,'*.jpg'))  
 
-# Use matplotlib to visualize the results
-for img, title in results:
-    plt.imshow(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-    plt.title(title)
-    plt.show()
+# Process each image in the directory
+for image in image_files:
+    # Read and process the image
+    our_image = cv2.cvtColor(cv2.imread(image), cv2.COLOR_BGR2RGB)
+    our_mask = np.zeros((our_image.shape[0], our_image.shape[1], 1), dtype=np.uint8)
 
-<<<<<<< HEAD
-=======
-   
->>>>>>> dbba2c5cdf05b702fc00b4f0a2e5f9d15a6804a7
-    
+    # Simulate inputs
+    input_image = {"image": our_image, "mask": our_mask}
+    text_prompt = "the tree in the middle"
+    task_type = "text"
+    background_prompt = "downtown area in New York"
+    background_type = "generated_by_text"
+    box_threshold = 0.25
+    text_threshold = 0.25
+    iou_threshold = 0.5
+    scribble_mode = "split"
+    guidance_mode = "alpha"
+
+    # Call the function
+    results = run_grounded_sam(input_image, text_prompt, task_type, background_prompt, background_type, box_threshold, text_threshold, iou_threshold, scribble_mode, guidance_mode)
+    # Process the results as needed
+    print(f"Processed results for image: {image}")
+
+    # Loop through the results and save each image
+    for result_image, label in results:
+        # Construct the output file path
+        output_file_name = f"{os.path.splitext(os.path.basename(image))[0]}_{label}.png"
+        output_file_path = os.path.join(output_dir, output_file_name)
+        
+        # Save the output image
+        cv2.imwrite(output_file_path, cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR))
+
+
