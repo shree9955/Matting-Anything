@@ -222,4 +222,8 @@ for img, title in results:
     plt.title(title)
     plt.show()
 
+<<<<<<< HEAD
+=======
+   
+>>>>>>> dbba2c5cdf05b702fc00b4f0a2e5f9d15a6804a7
     
