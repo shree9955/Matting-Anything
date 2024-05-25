@@ -200,7 +200,7 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
 
 import glob
 # Define the path to the directory containing images
-image_directory = '/home/aniket/shree/Matting-Anything/13-07-2022/13_07_2022/Ground_RGB_Photos/Armillaria_Stage_3'
+image_directory = '/home/aniket/shree/Matting-Anything/13-07-2022/13_07_2022/Ground_RGB_Photos/Healthy'
 
 # Get a list of all image files in the directory
 image_files = glob.glob(os.path.join(image_directory,'*.jpg'))  
