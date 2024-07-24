@@ -53,3 +53,4 @@ output_dir = '/home/aniket/shree/Matting-Anything/outputs'
 
 # Process all images and masks
 process_images_and_masks(image_dir, mask_dir, output_dir)
+

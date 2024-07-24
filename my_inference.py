@@ -245,3 +245,4 @@ for image in image_files:
         cv2.imwrite(output_file_path, cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR))
 
 
+
