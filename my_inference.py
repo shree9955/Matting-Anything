@@ -1,10 +1,12 @@
 # https://github.com/ultralytics/ultralytics/issues/11781 , this is to resolve status: CUDNN_STATUS_NOT_SUPPORTED
 
+# ------------------------------------------------------------------------
+# Modified from Grounded-SAM (https://github.com/IDEA-Research/Grounded-Segment-Anything)
+# ------------------------------------------------------------------------
 import os
 import random
 import cv2
 from scipy import ndimage
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -30,13 +32,14 @@ from diffusers import StableDiffusionPipeline
 torch.backends.cudnn.benchmark = True
 
 transform = ResizeLongestSide(1024)
+# Green Screen
 PALETTE_back = (51, 255, 146)
 
 GROUNDING_DINO_CONFIG_PATH = "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 GROUNDING_DINO_CHECKPOINT_PATH = "checkpoints/groundingdino_swint_ogc.pth"
-mam_checkpoint = "checkpoints/mam_vitb.pth"
-output_dir = "outputs"
-device = "cuda"
+mam_checkpoint="checkpoints/mam_vitb.pth"
+output_dir="outputs"
+device="cuda"
 background_list = os.listdir('assets/backgrounds')
 
 # initialize MAM
@@ -67,7 +70,7 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
 
     if task_type == 'text':
         if text_prompt is None:
-            raise ValueError('Please input non-empty text prompt')
+            print('Please input non-empty text prompt')
         with torch.no_grad():
             detections, phrases = grounding_dino_model.predict_with_caption(
                 image=cv2.cvtColor(image_ori, cv2.COLOR_RGB2BGR),
@@ -94,8 +97,8 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
     image = torch.as_tensor(image).to(device)
     image = image.permute(2, 0, 1).contiguous()
 
-    pixel_mean = torch.tensor([123.675, 116.28, 103.53]).view(3, 1, 1).to(device)
-    pixel_std = torch.tensor([58.395, 57.12, 57.375]).view(3, 1, 1).to(device)
+    pixel_mean = torch.tensor([123.675, 116.28, 103.53]).view(3,1,1).to(device)
+    pixel_std = torch.tensor([58.395, 57.12, 57.375]).view(3,1,1).to(device)
 
     image = (image - pixel_mean) / pixel_std
 
@@ -110,8 +113,9 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
 
         labeled_array, num_features = ndimage.label(scribble >= 255)
 
-        centers = ndimage.center_of_mass(scribble, labeled_array, range(1, num_features + 1))
+        centers = ndimage.center_of_mass(scribble, labeled_array, range(1, num_features+1))
         centers = np.array(centers)
+        ### (x,y)
         centers = transform.apply_coords(centers, original_size)
         point_coords = torch.from_numpy(centers).to(device)
         point_coords = point_coords.unsqueeze(0).to(device)
@@ -125,8 +129,9 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
     elif task_type == 'scribble_box':
         scribble = scribble.transpose(2, 1, 0)[0]
         labeled_array, num_features = ndimage.label(scribble >= 255)
-        centers = ndimage.center_of_mass(scribble, labeled_array, range(1, num_features + 1))
+        centers = ndimage.center_of_mass(scribble, labeled_array, range(1, num_features+1))
         centers = np.array(centers)
+        ### (x1, y1, x2, y2)
         x_min = centers[:, 0].min()
         x_max = centers[:, 0].max()
         y_min = centers[:, 1].min()
@@ -139,7 +144,7 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
     elif task_type == 'text':
         sample = {'image': image.unsqueeze(0), 'bbox': bbox.unsqueeze(0), 'ori_shape': original_size, 'pad_shape': pad_size}
     else:
-        raise ValueError(f"Invalid task_type: {task_type}")
+        print("task_type:{} error!".format(task_type))
 
     with torch.no_grad():
         feas, pred, post_mask = mam_model.forward_inference(sample)
@@ -155,22 +160,24 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
         
         if guidance_mode == 'mask':
             weight_os8 = utils.get_unknown_tensor_from_mask_oneside(post_mask, rand_width=10, train_mode=False)
-            post_mask[weight_os8 > 0] = alpha_pred_os8[weight_os8 > 0]
+            post_mask[weight_os8>0] = alpha_pred_os8[weight_os8>0]
             alpha_pred = post_mask.clone().detach()
         else:
             weight_os8 = utils.get_unknown_box_from_mask(post_mask)
-            alpha_pred_os8[weight_os8 > 0] = post_mask[weight_os8 > 0]
+            alpha_pred_os8[weight_os8>0] = post_mask[weight_os8>0]
             alpha_pred = alpha_pred_os8.clone().detach()
 
         weight_os4 = utils.get_unknown_tensor_from_pred_oneside(alpha_pred, rand_width=20, train_mode=False)
-        alpha_pred[weight_os4 > 0] = alpha_pred_os4[weight_os4 > 0]
+        alpha_pred[weight_os4>0] = alpha_pred_os4[weight_os4>0]
         
         weight_os1 = utils.get_unknown_tensor_from_pred_oneside(alpha_pred, rand_width=10, train_mode=False)
-        alpha_pred[weight_os1 > 0] = alpha_pred_os1[weight_os1 > 0]
+        alpha_pred[weight_os1>0] = alpha_pred_os1[weight_os1>0]
        
         alpha_pred = alpha_pred[0][0].cpu().numpy()
-
-    alpha_rgb = cv2.cvtColor(np.uint8(alpha_pred * 255), cv2.COLOR_GRAY2RGB)
+    #### draw
+    ### alpha matte
+    alpha_rgb = cv2.cvtColor(np.uint8(alpha_pred*255), cv2.COLOR_GRAY2RGB)
+    ### com img with background
     if background_type == 'random':
         background_path = os.path.join('assets/backgrounds', random.choice(background_list))
         background_img = cv2.imread(background_path)
@@ -180,21 +187,21 @@ def run_grounded_sam(input_image, text_prompt, task_type, background_prompt, bac
         com_img = np.uint8(com_img)
     else:
         if background_prompt is None:
-            raise ValueError('Please input non-empty background prompt')
+            print('Please input non-empty background prompt')
         else:
             background_img = generator(background_prompt).images[0]
             background_img = np.array(background_img)
             background_img = cv2.resize(background_img, (image_ori.shape[1], image_ori.shape[0]))
             com_img = alpha_pred[..., None] * image_ori + (1 - alpha_pred[..., None]) * np.uint8(background_img)
             com_img = np.uint8(com_img)
-
+    ### com img with green screen
     green_img = alpha_pred[..., None] * image_ori + (1 - alpha_pred[..., None]) * np.array([PALETTE_back], dtype='uint8')
     green_img = np.uint8(green_img)
 
     # Save the results instead of showing them
-    # cv2.imwrite(os.path.join(output_dir, 'composite_with_background.png'), cv2.cvtColor(com_img, cv2.COLOR_RGB2BGR))
-    # cv2.imwrite(os.path.join(output_dir, 'green_screen.png'), cv2.cvtColor(green_img, cv2.COLOR_RGB2BGR))
-    # cv2.imwrite(os.path.join(output_dir, 'alpha_matte.png'), cv2.cvtColor(alpha_rgb, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(os.path.join(output_dir, 'composite_with_background.png'), cv2.cvtColor(com_img, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(os.path.join(output_dir, 'green_screen.png'), cv2.cvtColor(green_img, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(os.path.join(output_dir, 'alpha_matte.png'), cv2.cvtColor(alpha_rgb, cv2.COLOR_RGB2BGR))
 
     return [(com_img, 'composite_with_background'), (green_img, 'green_screen'), (alpha_rgb, 'alpha_matte')]
 
@@ -213,7 +220,7 @@ for image in image_files:
 
     # Simulate inputs
     input_image = {"image": our_image, "mask": our_mask}
-    text_prompt = "the tree in the middle"
+    text_prompt = "the Sweet Cherry tree in the middle "
     task_type = "text"
     background_prompt = "downtown area in New York"
     background_type = "generated_by_text"
